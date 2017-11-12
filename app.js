@@ -6,6 +6,7 @@ import 'console.table';
 var availableTesters = []; //[{testerId, firstName, lastName, lastLogin}]
 var availableDevices = []; // [{deviceId, description}]
 var availableCountries = []; //[countries]
+var deviceIDs = [];
 
 const connection = mysql.createConnection({
   host: "localhost",
@@ -32,9 +33,9 @@ const promptDevice = new Prompt ({
   }
 });
 
-runProgram();
+on();
 
-async function runProgram() {
+async function on() {
   await setAvailableCountriesAndTesters();
   await setAvailableDevices();
   promptUser();
@@ -77,17 +78,32 @@ async function searchForTesters(countries, devices) {
   }
   else filteredTesters = availableTesters
 
-  // sortAndPrintTesters(filteredTesters);
-  // promptSearchAgain();
+  // sortAndPrintTesters(searchForBugs(filteredTesters, deviceIDs));
+  console.table(await searchForBugs(filteredTesters, deviceIDs));
 
-  console.table(filteredTesters);
+  // console.table(filteredTesters);
   process.exit();
+}
+
+function searchForBugs(testers, devices) {
+  let testerIDS = [];
+
+  testers.forEach((tester, i) => {
+    testerIDS.push(tester.testerId);
+  });
+
+  return new Promise ( (resolve, reject) => {
+    connection.query('SELECT * from bugs WHERE testerId IN (' + testerIDS.join() + ') AND WHERE deviceId IN (' + devices.join() + ')', (err, rows) => {
+      if (err) throw err;
+      resolve(rows);
+    });
+
+  });
 }
 
 function filterTestersByDevices(devices, testersDevices, testers) {
   let testersIDs = [];
   let filteredTesters = [];
-  let deviceIDs = [];
 
   //set device Ids by looking them up in availableDevices
   devices.forEach(device => {
@@ -107,23 +123,10 @@ function filterTestersByDevices(devices, testersDevices, testers) {
     });
   });
 
-  console.log(deviceIDs);
-  console.log(testersDevices);
-  //remove any testers that do not have all devices
-  testersIDs.forEach(tester => {
-    deviceIDs.forEach(device => {
-      if (!testersDevices.includes({ testerId: 1, deviceId: 1 })) {
-        testersIDs.splice(testersIDs.indexOf(tester), 1);
-      }
-    });
-  });
-
-
-  console.log(testersIDs);
   //create array of filtered testers
   testersIDs.forEach(id => {
-    testers.forEach(tester => {
-      if (id === tester.testerId) {
+    availableTesters.forEach(tester => {
+      if (id == tester.testerId) {
         filteredTesters.push(tester);
       }
     });
@@ -161,8 +164,8 @@ function getTestersDevices(testers) {
   });
 }
 
-
 function setAvailableCountriesAndTesters() {
+  //sets available countries and testers
   return new Promise ( (resolve, reject) => {
     connection.query('SELECT * from testers', (err,rows) => {
       if (err) throw err;
